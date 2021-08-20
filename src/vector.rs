@@ -1,6 +1,5 @@
-
+use crate::utils::EPSILON;
 use std::ops;
-use crate::math::EPSILON;
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Vec2 {
@@ -57,7 +56,6 @@ impl Vec2 {
     pub fn length(self) -> f64 {
         self.length_squared().sqrt()
     }
-    
 
     pub fn as_slice(self) -> [f64; 2] {
         [self.x, self.y]
@@ -101,7 +99,10 @@ impl ops::Neg for Vec2 {
     type Output = Self;
 
     fn neg(self) -> Self {
-        Self {x: -self.x, y: -self.y}
+        Self {
+            x: -self.x,
+            y: -self.y,
+        }
     }
 }
 
@@ -110,8 +111,8 @@ impl ops::Mul<Vec2> for RotationMatrix {
 
     fn mul(self, other: Vec2) -> Vec2 {
         Vec2 {
-            x: self.0 * other.x + self.1 * other.y, 
-            y: self.2 * other.x + self.3 * other.y
+            x: self.0 * other.x + self.1 * other.y,
+            y: self.2 * other.x + self.3 * other.y,
         }
     }
 }
@@ -120,7 +121,10 @@ impl ops::Add<Vec2> for Vec2 {
     type Output = Self;
 
     fn add(self, other: Self) -> Self {
-        Self {x: self.x + other.x, y: self.y + other.y}
+        Self {
+            x: self.x + other.x,
+            y: self.y + other.y,
+        }
     }
 }
 
@@ -128,7 +132,10 @@ impl ops::Add<f64> for Vec2 {
     type Output = Self;
 
     fn add(self, other: f64) -> Self {
-        Self {x: self.x + other, y: self.y + other }
+        Self {
+            x: self.x + other,
+            y: self.y + other,
+        }
     }
 }
 
@@ -136,7 +143,10 @@ impl ops::Add<Vec2> for f64 {
     type Output = Vec2;
 
     fn add(self, other: Vec2) -> Vec2 {
-        Vec2 {x: other.x + self, y: other.y + self }
+        Vec2 {
+            x: other.x + self,
+            y: other.y + self,
+        }
     }
 }
 
@@ -144,7 +154,10 @@ impl ops::Mul<f64> for Vec2 {
     type Output = Self;
 
     fn mul(self, other: f64) -> Self {
-        Self {x: self.x * other, y: self.y * other }
+        Self {
+            x: self.x * other,
+            y: self.y * other,
+        }
     }
 }
 
@@ -152,7 +165,10 @@ impl ops::Div<f64> for Vec2 {
     type Output = Self;
 
     fn div(self, other: f64) -> Self {
-        Self {x: self.x / other, y: self.y / other }
+        Self {
+            x: self.x / other,
+            y: self.y / other,
+        }
     }
 }
 
@@ -160,7 +176,10 @@ impl ops::Mul<Vec2> for f64 {
     type Output = Vec2;
 
     fn mul(self, other: Vec2) -> Vec2 {
-        Vec2 {x: other.x * self, y: other.y * self }
+        Vec2 {
+            x: other.x * self,
+            y: other.y * self,
+        }
     }
 }
 
@@ -168,7 +187,10 @@ impl ops::Sub<Vec2> for Vec2 {
     type Output = Self;
 
     fn sub(self, other: Self) -> Self {
-        Self {x: self.x - other.x, y: self.y - other.y}
+        Self {
+            x: self.x - other.x,
+            y: self.y - other.y,
+        }
     }
 }
 
@@ -176,7 +198,10 @@ impl ops::Sub<f64> for Vec2 {
     type Output = Self;
 
     fn sub(self, other: f64) -> Self {
-        Self {x: self.x - other, y: self.y - other}
+        Self {
+            x: self.x - other,
+            y: self.y - other,
+        }
     }
 }
 
