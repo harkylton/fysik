@@ -50,8 +50,8 @@ impl App {
         });
     }
 
-    fn update(&mut self, _args: &UpdateArgs) {
-        self.world.update();
+    fn update(&mut self, args: &UpdateArgs) {
+        self.world.update(args.dt);
     }
 }
 

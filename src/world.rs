@@ -1,13 +1,10 @@
 use crate::body::{Body, BodyHandle, BodySet};
 use crate::collisions::Pair;
 use crate::vector::Vec2;
-use std::time::Instant;
 
 pub struct World {
     pub bodies: BodySet,
     gravity: Vec2,
-    dt: f64,
-    last_update: Instant,
     impulse_iterations: usize,
     bounds: (Vec2, Vec2),
 }
@@ -17,8 +14,6 @@ impl World {
         World {
             bodies: BodySet::new(),
             gravity: Vec2::new(0.0, 50.0),
-            dt: 1.0 / 60.0,
-            last_update: Instant::now(),
             impulse_iterations: 10,
             bounds: (Vec2::new(-500.0, -500.0), Vec2::new(1000.0, 1000.0)),
         }
@@ -49,22 +44,12 @@ impl World {
     pub fn add_body(&mut self, body: Body) -> BodyHandle {
         self.bodies.push(body)
     }
-    pub fn update(&mut self) {
-        //let elapsed = self.last_update.elapsed().as_secs_f64();
-        //println!("{:?}", elapsed);
-        //let mut accumulator = clamp(0.0, 0.1, elapsed);
-
-        //self.last_update = Instant::now();
-        //
-        //while accumulator >= self.dt {
-        //    self.step();
-        //    accumulator -= self.dt;
-        //}
-        self.step();
+    pub fn update(&mut self, dt: f64) {
+        self.step(dt);
         self.prune_bodies(self.bounds.0, self.bounds.1);
     }
 
-    pub fn step(&mut self) {
+    pub fn step(&mut self, dt: f64) {
         let mut manifolds = vec![];
 
         // Generate collision pairs
@@ -78,17 +63,17 @@ impl World {
         }
         // Apply forces
         for (_, body) in self.bodies.iter_mut() {
-            body.apply_forces(self.dt, self.gravity)
+            body.apply_forces(dt, self.gravity)
         }
         // Resolve collisions
         for _ in 0..self.impulse_iterations {
             for manifold in &manifolds {
-                manifold.apply_impulse(&mut self.bodies, self.dt, self.gravity);
+                manifold.apply_impulse(&mut self.bodies, dt, self.gravity);
             }
         }
         // Apply velocities
         for (_, body) in self.bodies.iter_mut() {
-            body.apply_velocities(self.dt, self.gravity)
+            body.apply_velocities(dt, self.gravity)
         }
         // Correct positions
         for manifold in &manifolds {
