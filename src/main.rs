@@ -10,8 +10,8 @@ use graphics::context::Context;
 use opengl_graphics::{GlGraphics, OpenGL};
 use piston::event_loop::{EventSettings, Events};
 use piston::input::{
-    Button, MouseButton, MouseCursorEvent, PressEvent, RenderArgs, RenderEvent, UpdateArgs,
-    UpdateEvent,
+    Button, Key, MouseButton, MouseCursorEvent, PressEvent, RenderArgs, RenderEvent,
+    UpdateArgs, UpdateEvent,
 };
 use piston::window::WindowSettings;
 
@@ -33,6 +33,7 @@ use crate::world::World;
 pub struct App {
     gl: GlGraphics, // OpenGL drawing backend.
     world: World,
+    paused: bool,
 }
 
 impl App {
@@ -51,7 +52,9 @@ impl App {
     }
 
     fn update(&mut self, args: &UpdateArgs) {
-        self.world.update(args.dt);
+        if !self.paused {
+            self.world.update(args.dt);
+        }
     }
 }
 
@@ -70,6 +73,7 @@ fn main() {
     let mut app = App {
         gl: GlGraphics::new(opengl),
         world: World::new(),
+        paused: false,
     };
 
     app.world.add_body(Body::new(
@@ -94,8 +98,10 @@ fn main() {
         Vec2 { x: 101.0, y: 50.0 },
         BOUNCY_BALL,
     ));
+
     let mut cursor = [0.0, 0.0];
     let mut events = Events::new(EventSettings::new());
+
     while let Some(e) = events.next(&mut window) {
         e.mouse_cursor(|pos| {
             cursor = pos;
@@ -118,6 +124,19 @@ fn main() {
                 ));
             }
         }
+
+        if let Some(Button::Keyboard(key)) = e.press_args() {
+            if key == Key::P {
+                println!("Toggled pause..");
+                app.paused = !app.paused;
+                // capture_cursor = !capture_cursor;
+                // window.set_capture_cursor(capture_cursor);
+            } else if key == Key::S {
+                if app.paused {
+                    app.world.step(1.0 / 60.0);
+                }
+            }
+        };
 
         if let Some(args) = e.render_args() {
             app.render(&args);
