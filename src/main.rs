@@ -5,12 +5,12 @@ extern crate opengl_graphics;
 extern crate piston;
 
 use glutin_window::GlutinWindow as Window;
-use graphics::color::{NAVY, SILVER};
+use graphics::color::{NAVY, RED, SILVER};
 use graphics::context::Context;
 use opengl_graphics::{GlGraphics, OpenGL};
 use piston::event_loop::{EventSettings, Events};
 use piston::input::{
-    Button, Key, MouseButton, MouseCursorEvent, PressEvent, RenderArgs, RenderEvent,
+    Button, Key, MouseButton, MouseCursorEvent, PressEvent, ReleaseEvent, RenderArgs, RenderEvent,
     UpdateArgs, UpdateEvent,
 };
 use piston::window::WindowSettings;
@@ -23,17 +23,24 @@ mod utils;
 mod vector;
 mod world;
 
-use crate::body::Body;
+use crate::body::{Body, BodyHandle};
 use crate::material::{BOUNCY_BALL, STATIC, WOOD};
 use crate::shape::Shape;
 use crate::utils::radians;
 use crate::vector::Vec2;
 use crate::world::World;
 
+struct DragState {
+    handle: BodyHandle,
+    start: Vec2,
+    end: Vec2,
+}
+
 pub struct App {
     gl: GlGraphics, // OpenGL drawing backend.
     world: World,
     paused: bool,
+    drag_state: Option<DragState>,
 }
 
 impl App {
@@ -41,12 +48,24 @@ impl App {
         use graphics::*;
 
         let bodies = self.world.bodies.iter();
+        let drag_state = &self.drag_state;
 
         self.gl.draw(args.viewport(), |c, gl| {
             clear(SILVER, gl);
 
             for (_, body) in bodies {
                 draw_body(gl, c, &body);
+            }
+
+            if let Some(DragState { start, end, .. }) = drag_state {
+                line_from_to(
+                    RED,
+                    1.0,
+                    [start.x, start.y],
+                    [end.x, end.y],
+                    c.transform,
+                    gl,
+                );
             }
         });
     }
@@ -55,6 +74,30 @@ impl App {
         if !self.paused {
             self.world.update(args.dt);
         }
+    }
+
+    fn end_drag(&mut self) {
+        if let Some(DragState { handle, start, end }) = self.drag_state {
+            self.world.drag_body(handle, start, end);
+            self.drag_state = None;
+        }
+    }
+
+    fn update_drag(&mut self, position: Vec2) {
+        if let Some(drag_state) = &self.drag_state {
+            self.drag_state = Some(DragState {
+                end: position,
+                ..*drag_state
+            });
+        }
+    }
+
+    fn start_drag(&mut self, handle: BodyHandle, position: Vec2) {
+        self.drag_state = Some(DragState {
+            handle,
+            start: position,
+            end: position,
+        })
     }
 }
 
@@ -74,6 +117,7 @@ fn main() {
         gl: GlGraphics::new(opengl),
         world: World::new(),
         paused: false,
+        drag_state: None,
     };
 
     app.world.add_body(Body::new(
@@ -105,15 +149,19 @@ fn main() {
     while let Some(e) = events.next(&mut window) {
         e.mouse_cursor(|pos| {
             cursor = pos;
+            app.update_drag(Vec2::new(cursor[0], cursor[1]));
         });
 
         if let Some(Button::Mouse(button)) = e.press_args() {
             if let MouseButton::Left = button {
-                app.world.add_body(Body::new(
-                    Shape::Circle { r: 20.0 },
-                    Vec2::new(cursor[0], cursor[1]),
-                    BOUNCY_BALL,
-                ));
+                let position = Vec2::new(cursor[0], cursor[1]);
+                if let Some(handle) = app.world.body_at_point(position) {
+                    app.start_drag(handle, position);
+                    println!("Dragstart: {:?}", cursor);
+                } else {
+                    app.world
+                        .add_body(Body::new(Shape::Circle { r: 20.0 }, position, BOUNCY_BALL));
+                }
             }
 
             if let MouseButton::Right = button {
@@ -124,6 +172,13 @@ fn main() {
                 ));
             }
         }
+
+        if let Some(Button::Mouse(button)) = e.release_args() {
+            if button == MouseButton::Left {
+                println!("Release: {:?}", cursor);
+                app.end_drag();
+            }
+        };
 
         if let Some(Button::Keyboard(key)) = e.press_args() {
             if key == Key::P {
@@ -150,7 +205,6 @@ fn main() {
 
 fn draw_body(gl: &mut GlGraphics, c: Context, body: &Body) {
     use graphics::*;
-    const RED: [f32; 4] = [1.0, 0.0, 0.0, 1.0];
 
     match &body.shape {
         Shape::Circle { r } => {

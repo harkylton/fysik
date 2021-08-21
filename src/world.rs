@@ -1,5 +1,5 @@
 use crate::body::{Body, BodyHandle, BodySet};
-use crate::collisions::Pair;
+use crate::collisions::{Pair, point_in_body};
 use crate::vector::Vec2;
 
 pub struct World {
@@ -35,6 +35,26 @@ impl World {
         for handle in to_remove {
             self.bodies.remove(handle);
         }
+    }
+
+    pub fn body_at_point(&self, point: Vec2) -> Option<BodyHandle> {
+        for (handle, body) in self.bodies.iter() {
+            if point_in_body(point, body) {
+                return Some(handle);
+            }
+        }
+
+        None
+    }
+
+    pub fn drag_body(&mut self, handle: BodyHandle, start: Vec2, end: Vec2) {
+        let body = self.bodies.get_mut(handle).unwrap();
+
+        let contact_point = start - body.position;
+
+        let impulse = (end - start) / body.inv_mass;
+
+        body.apply_impulse(impulse, contact_point);
     }
 
     pub fn remove_body(&mut self, handle: BodyHandle) -> Option<Body> {
