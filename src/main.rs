@@ -5,7 +5,7 @@ extern crate opengl_graphics;
 extern crate piston;
 
 use glutin_window::GlutinWindow as Window;
-use graphics::color::{NAVY, RED, SILVER};
+use graphics::color::{NAVY, RED, SILVER, GREEN};
 use graphics::context::Context;
 use opengl_graphics::{GlGraphics, OpenGL};
 use piston::event_loop::{EventSettings, Events};
@@ -22,6 +22,7 @@ mod shape;
 mod utils;
 mod vector;
 mod world;
+mod constraint;
 
 use crate::body::{Body, BodyHandle};
 use crate::material::{BOUNCY_BALL, STATIC, WOOD};
@@ -29,6 +30,7 @@ use crate::shape::Shape;
 use crate::utils::radians;
 use crate::vector::Vec2;
 use crate::world::World;
+use crate::constraint::RopeJoint;
 
 struct DragState {
     handle: BodyHandle,
@@ -48,7 +50,16 @@ impl App {
         use graphics::*;
 
         let bodies = self.world.bodies.iter();
+        let constraints = self.world.constraints.iter();
         let drag_state = &self.drag_state;
+
+        let mut ropes = vec![];
+
+        for constraint in constraints {
+            if let Some((a, b)) = constraint.get_contacts(&self.world.bodies) {
+                ropes.push((a, b))
+            }
+        }
 
         self.gl.draw(args.viewport(), |c, gl| {
             clear(SILVER, gl);
@@ -57,6 +68,17 @@ impl App {
                 draw_body(gl, c, &body);
             }
 
+            for (a, b) in ropes {
+                line_from_to(
+                    GREEN,
+                    1.0,
+                    [a.x, a.y],
+                    [b.x, b.y],
+                    c.transform,
+                    gl,
+                );
+            }
+            
             if let Some(DragState { start, end, .. }) = drag_state {
                 line_from_to(
                     RED,
@@ -126,22 +148,50 @@ fn main() {
         STATIC,
     ));
 
-    app.world.add_body(Body::new(
+    let anchor = app.world.add_body(Body::new(
         Shape::circle(50.0),
         Vec2 { x: 350.0, y: 500.0 },
         STATIC,
     ));
 
-    app.world.add_body(Body::new(
+    for i in -2..2 {
+        let ball = app.world.add_body(Body::new(
+            Shape::circle(10.0),
+            Vec2 { x: 350.0 + i as f64 * 30.0, y: 550.0 },
+            BOUNCY_BALL,
+        ));
+
+        app.world.add_constraint(
+            RopeJoint { 
+                a: anchor, 
+                b: ball, 
+                anchor_a: Vec2::origin(),
+                anchor_b: Vec2::origin(),
+                max_distance: 150.0,
+            }
+        );
+    }
+
+    let a = app.world.add_body(Body::new(
         Shape::Circle { r: 10.0 },
         Vec2 { x: 100.0, y: 100.0 },
         BOUNCY_BALL,
     ));
-    app.world.add_body(Body::new(
+    let b = app.world.add_body(Body::new(
         Shape::Circle { r: 20.0 },
         Vec2 { x: 101.0, y: 50.0 },
         BOUNCY_BALL,
     ));
+
+    app.world.add_constraint(
+        RopeJoint { 
+            a, 
+            b, 
+            anchor_a: Vec2 { x: 5.0, y: 0.0 }, 
+            anchor_b: Vec2 { x: 15.0, y: 0.0 },
+            max_distance: 50.0,
+        }
+    );
 
     let mut cursor = [0.0, 0.0];
     let mut events = Events::new(EventSettings::new());
@@ -159,14 +209,35 @@ fn main() {
                     app.start_drag(handle, position);
                     println!("Dragstart: {:?}", cursor);
                 } else {
-                    app.world
-                        .add_body(Body::new(Shape::Circle { r: 20.0 }, position, BOUNCY_BALL));
+                    // app.world
+                    //     .add_body(Body::new(Shape::Circle { r: 20.0 }, position, BOUNCY_BALL));
+                    
+                    let mut last_body: Option<BodyHandle> = None;
+                    for i in 0..10 {
+                        let new_body = app.world.add_body(Body::new(
+                            Shape::circle(10.0),
+                            Vec2::new(cursor[0] + i as f64 * 30.0, cursor[1]),
+                            BOUNCY_BALL,
+                        ));
+
+                        if let Some(old_body) = last_body {
+                            app.world.add_constraint(RopeJoint {
+                                a: new_body, 
+                                b: old_body, 
+                                anchor_a: Vec2::origin(),
+                                anchor_b: Vec2::origin(),
+                                max_distance: 30.0,
+                            })
+                        }
+
+                        last_body = Some(new_body);
+                    }
                 }
             }
 
             if let MouseButton::Right = button {
                 app.world.add_body(Body::new(
-                    Shape::random_polygon(),
+                    Shape::rect(200.0, 10.0),
                     Vec2::new(cursor[0], cursor[1]),
                     WOOD,
                 ));
@@ -202,6 +273,7 @@ fn main() {
         }
     }
 }
+
 
 fn draw_body(gl: &mut GlGraphics, c: Context, body: &Body) {
     use graphics::*;

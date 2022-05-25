@@ -14,14 +14,15 @@ pub struct Manifold {
 }
 
 impl Manifold {
-    pub fn apply_impulse(&self, bodies: &mut BodySet, dt: f64, gravity: Vec2) {
+    pub fn new(a: BodyHandle, b: BodyHandle, normal: Vec2, penetration: f64, contacts: Vec<Vec2>) -> Manifold {
+        Manifold { a, b, normal, penetration, contacts }
+    }
+
+    pub fn apply_impulse(&self, bodies: &mut BodySet, dt: f64, gravity: Vec2, apply_friction: bool) {
         if let (Some(a), Some(b)) = bodies.get2_mut(self.a, self.b) {
             if a.inv_mass + b.inv_mass == 0.0 {
                 return;
             }
-
-            let sf = (a.static_friction * b.static_friction).sqrt();
-            let df = (a.dynamic_friction * b.dynamic_friction).sqrt();
 
             let contact_count_f = self.contacts.len() as f64;
 
@@ -65,29 +66,34 @@ impl Manifold {
 
                 a.apply_impulse(-impulse, ra);
                 b.apply_impulse(impulse, rb);
+                
+                if apply_friction {
+                    let sf = (a.static_friction * b.static_friction).sqrt();
+                    let df = (a.dynamic_friction * b.dynamic_friction).sqrt();
 
-                let new_rv = b.velocity + b.angular_velocity.cross(rb)
-                    - a.velocity
-                    - a.angular_velocity.cross(ra);
+                    let new_rv = b.velocity + b.angular_velocity.cross(rb)
+                        - a.velocity
+                        - a.angular_velocity.cross(ra);
 
-                // Friction impulse
-                let t = (new_rv - self.normal * new_rv.dot(self.normal)).normalize();
+                    // Friction impulse
+                    let t = (new_rv - self.normal * new_rv.dot(self.normal)).normalize();
 
-                let jt = -new_rv.dot(t) / inv_mass_sum / contact_count_f;
+                    let jt = -new_rv.dot(t) / inv_mass_sum / contact_count_f;
 
-                if jt == 0.0 {
-                    return;
+                    if jt == 0.0 {
+                        return;
+                    }
+
+                    // Coulumb's law
+                    let tangent_impulse = if jt.abs() < j * sf {
+                        t * jt
+                    } else {
+                        t * -j * df
+                    };
+
+                    a.apply_impulse(-tangent_impulse, ra);
+                    b.apply_impulse(tangent_impulse, rb);
                 }
-
-                // Coulumb's law
-                let tangent_impulse = if jt.abs() < j * sf {
-                    t * jt
-                } else {
-                    t * -j * df
-                };
-
-                a.apply_impulse(-tangent_impulse, ra);
-                b.apply_impulse(tangent_impulse, rb);
             }
         }
     }
